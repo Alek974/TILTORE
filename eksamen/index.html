@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <title>Restaurantkart</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        h1 {
+            margin: 0;
+            padding: 10px;
+            background: #333;
+            color: white;
+            text-align: center;
+        }
+
+        /* ===== LOGIN ===== */
+        #login {
+            position: fixed;
+            inset: 0;
+            background: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+        }
+
+        .login-box {
+            background: white;
+            padding: 25px;
+            width: 300px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .login-box h2 {
+            margin-top: 0;
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+
+        .login-box button {
+            width: 100%;
+            padding: 10px;
+            background: #333;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .login-box button:hover {
+            background: #555;
+        }
+
+        /* ===== APP ===== */
+        #app {
+            display: none;
+        }
+
+        #container {
+            display: flex;
+            height: calc(100vh - 52px);
+        }
+
+        #sidebar {
+            width: 300px;
+            padding: 10px;
+            background: #f5f5f5;
+            overflow-y: auto;
+            border-right: 1px solid #ccc;
+        }
+
+        #map {
+            flex: 1;
+        }
+
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+
+        .restaurant {
+            padding: 8px;
+            background: white;
+            margin-bottom: 8px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .restaurant:hover {
+            background: #eaeaea;
+        }
+
+        .type {
+            font-size: 0.9em;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+    <div class="login-box">
+        <h2>Logg inn</h2>
+        <input type="email" placeholder="E-post">
+        <input type="password" placeholder="Passord">
+        <input type="tel" placeholder="Telefonnummer">
+        <button onclick="login()">Logg inn</button>
+    </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+    <h1>Restauranter i norge baby</h1>
+
+    <div id="container">
+        <div id="sidebar">
+            <input type="text" id="search" placeholder="Søk restaurant...">
+            <div id="restaurantList"></div>
+        </div>
+
+        <div id="map"></div>
+    </div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    function login() {
+        document.getElementById("login").style.display = "none";
+        document.getElementById("app").style.display = "block";
+        map.invalidateSize();
+    }
+
+    const map = L.map('map').setView([59.9139, 10.7522], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+   const restaurants = [
+    { name: "Pasta Paradiso", coords: [59.9145, 10.7510], type: "Italiensk 🍕", rating: 4.5 },
+    { name: "Sushi House", coords: [59.9120, 10.7600], type: "Sushi 🍣", rating: 4.2 },
+    { name: "Burger Bros", coords: [59.9165, 10.7450], type: "Burger 🍔", rating: 4.0 },
+    { name: "Taco Loco", coords: [59.9210, 10.7550], type: "Mexicansk 🌮", rating: 4.3 },
+    { name: "Curry Corner", coords: [59.9150, 10.7580], type: "Indisk 🍛", rating: 4.4 },
+    { name: "Vegan Vibes", coords: [59.9130, 10.7490], type: "Vegansk 🥗", rating: 4.6 },
+
+    // Flere Oslo-restauranter
+    { name: "Maaemo", coords: [59.9129, 10.7541], type: "Gourmet 🍽️", rating: 4.9 },
+    { name: "Statholdergaarden", coords: [59.9122, 10.7405], type: "Gourmet 🍷", rating: 4.7 },
+    { name: "Ekebergrestauranten", coords: [59.9015, 10.7683], type: "Klassisk Norsk 🍲", rating: 4.4 },
+    { name: "Olympen Bar & Restaurant", coords: [59.9123, 10.7645], type: "Brasserie 🍺", rating: 4.5 },
+    { name: "Pascal Konditori", coords: [59.9101, 10.7462], type: "Kafé ☕", rating: 4.3 },
+
+    // Flere fiktive/varierte steder (for moro og variasjon)
+    { name: "Nordic Noodles", coords: [59.9180, 10.7400], type: "Asiatisk 🍜", rating: 4.3 },
+    { name: "Oslo BBQ House", coords: [59.9190, 10.7290], type: "BBQ 🍖", rating: 4.2 },
+    { name: "Fjord Fish & Grill", coords: [59.9060, 10.7550], type: "Sjømat 🐟", rating: 4.6 },
+    { name: "Green Garden Bistro", coords: [59.9225, 10.7478], type: "Vegetar 🌿", rating: 4.4 }
+];
+
+
+    const markers = [];
+    const list = document.getElementById("restaurantList");
+
+    function renderList(filter = "") {
+        list.innerHTML = "";
+        restaurants
+            .filter(r => r.name.toLowerCase().includes(filter.toLowerCase()))
+            .forEach((r, i) => {
+                const div = document.createElement("div");
+                div.className = "restaurant";
+                div.innerHTML = `
+                    <strong>${r.name}</strong><br>
+                    <span class="type">${r.type}</span><br>
+                    ⭐ ${r.rating}
+                `;
+                div.onclick = () => {
+                    map.setView(r.coords, 16);
+                    markers[i].openPopup();
+                };
+                list.appendChild(div);
+            });
+    }
+
+    restaurants.forEach(r => {
+        const marker = L.marker(r.coords)
+            .addTo(map)
+            .bindPopup(`<b>${r.name}</b><br>${r.type}<br>⭐ ${r.rating}`);
+        markers.push(marker);
+    });
+
+    document.getElementById("search").addEventListener("input", e => {
+        renderList(e.target.value);
+    });
+
+    renderList();
+</script>
+
+</body>
+</html>
+
